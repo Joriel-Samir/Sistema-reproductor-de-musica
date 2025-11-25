@@ -15,10 +15,10 @@ JavaScript (Vanilla)
 HTML5 
 CSS3
 
-Estructuras de Datos
+Estructuras de Datos:
 
-Lista Enlazada Circular - Gestión de playlists y navegación
-Algoritmo de Ordenamiento por Inserción - Ordenar canciones
+* Lista Enlazada Circular - Gestión de playlists y navegación
+* Algoritmo de Ordenamiento por Inserción - Ordenar canciones
 
 Instalación
 Requisitos previos
