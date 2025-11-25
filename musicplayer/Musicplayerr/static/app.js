@@ -1,10 +1,8 @@
-console.log("App.js loaded — esperando datos del backend Flask…");
-
 // ============ VARIABLES GLOBALES ============
 let playlists = [];      
 let songs = [];          
-let currentIndex = 0;           // Índice de la canción actual
-let currentPlaylistIndex = 0;   // Índice de la playlist actual
+let currentIndex = 0;
+let currentPlaylistIndex = 0;
 let currentSong = new Audio();
 
 // ============ UTILIDADES ============
@@ -25,7 +23,6 @@ function renderPlaylists() {
         li.textContent = `${playlist.name} (${playlist.songs.length})`;
         li.style.cursor = "pointer";
         
-        // Resaltar la playlist seleccionada
         if (idx === currentPlaylistIndex) {
             li.style.fontWeight = "bold";
             li.style.color = "#667eea";
@@ -38,16 +35,15 @@ function renderPlaylists() {
 
 // ============ SELECCIONAR PLAYLIST ============
 async function selectPlaylist(idx) {
-    currentPlaylistIndex = idx;  // Guardar índice de playlist
-    currentIndex = 0;            // Resetear índice de canción
+    currentPlaylistIndex = idx;
+    currentIndex = 0;
     songs = playlists[idx].songs;
     
-    // ============ NUEVO: Inicializar canción actual en backend ============
     if (songs.length > 0) {
         await setCurrentSongAPI(0);
     }
     
-    renderPlaylists();  // Re-renderizar para actualizar highlight
+    renderPlaylists();
     renderSongs();
     updatePlayer();
 }
@@ -117,7 +113,6 @@ function updateProgressBar() {
         const percentage = (currentTime / duration) * 100;
         circle.style.left = `${percentage}%`;
         
-        // Actualizar tiempo mostrado
         document.querySelector(".songtime").innerHTML =
             `${secondsToMinutesSeconds(currentTime)} / ${secondsToMinutesSeconds(duration)}`;
     }
@@ -139,16 +134,11 @@ async function loadDataFromBackend() {
     }
 }
 
-// ============ NUEVAS FUNCIONES API - LISTA CIRCULAR ============
+// ============ FUNCIONES API - LISTA CIRCULAR ============
 
 async function nextSongAPI() {
     const playlistName = playlists[currentPlaylistIndex]?.name;
-    if (!playlistName) {
-        console.error("❌ No hay playlist seleccionada");
-        return;
-    }
-
-    console.log("🔄 Llamando API next para:", playlistName);
+    if (!playlistName) return;
 
     try {
         const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/next`, {
@@ -156,37 +146,25 @@ async function nextSongAPI() {
         });
         const data = await response.json();
         
-        console.log("✅ Respuesta next:", data);
-        
         if (response.ok && data.song) {
-            // Encontrar índice de la nueva canción
             currentIndex = songs.findIndex(s => s.name === data.song.name && s.url === data.song.url);
             
             if (currentIndex === -1) {
-                console.warn("⚠️ Canción no encontrada en array, usando índice 0");
                 currentIndex = 0;
             }
             
             renderSongs();
             updatePlayer();
             playMusic(data.song.url);
-            console.log("🎵 Reproduciendo:", data.song.name);
-        } else {
-            console.error("❌ Error en respuesta:", data);
         }
     } catch (err) {
-        console.error("❌ Error en next song:", err);
+        console.error("Error en next song:", err);
     }
 }
 
 async function previousSongAPI() {
     const playlistName = playlists[currentPlaylistIndex]?.name;
-    if (!playlistName) {
-        console.error("❌ No hay playlist seleccionada");
-        return;
-    }
-
-    console.log("🔄 Llamando API previous para:", playlistName);
+    if (!playlistName) return;
 
     try {
         const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/previous`, {
@@ -194,25 +172,19 @@ async function previousSongAPI() {
         });
         const data = await response.json();
         
-        console.log("✅ Respuesta previous:", data);
-        
         if (response.ok && data.song) {
             currentIndex = songs.findIndex(s => s.name === data.song.name && s.url === data.song.url);
             
             if (currentIndex === -1) {
-                console.warn("⚠️ Canción no encontrada en array, usando índice 0");
                 currentIndex = 0;
             }
             
             renderSongs();
             updatePlayer();
             playMusic(data.song.url);
-            console.log("🎵 Reproduciendo:", data.song.name);
-        } else {
-            console.error("❌ Error en respuesta:", data);
         }
     } catch (err) {
-        console.error("❌ Error en previous song:", err);
+        console.error("Error en previous song:", err);
     }
 }
 
@@ -220,16 +192,12 @@ async function setCurrentSongAPI(index) {
     const playlistName = playlists[currentPlaylistIndex]?.name;
     if (!playlistName) return;
 
-    console.log(`🎯 Estableciendo canción ${index} en playlist:`, playlistName);
-
     try {
-        const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/set_current/${index}`, {
+        await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/set_current/${index}`, {
             method: "POST"
         });
-        const data = await response.json();
-        console.log("✅ Set current response:", data);
     } catch (err) {
-        console.error("❌ Error en set current song:", err);
+        console.error("Error en set current song:", err);
     }
 }
 
@@ -244,10 +212,8 @@ async function sortPlaylist(sortBy) {
         const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/sort/${sortBy}`, {
             method: "POST"
         });
-        const data = await response.json();
         
         if (response.ok) {
-            console.log(`✅ Playlist ordenada por ${sortBy}`);
             await loadDataFromBackend();
         }
     } catch (err) {
@@ -257,11 +223,8 @@ async function sortPlaylist(sortBy) {
 
 // ============ MAIN ============
 async function main() {
-    console.log("🎵 Inicializando reproductor…");
-
     await loadDataFromBackend();
 
-    // ----- Botones del reproductor -----
     const playBtn = document.querySelector("#play");
     const nextBtn = document.querySelector("#next");
     const prevBtn = document.querySelector("#previous");
@@ -276,37 +239,22 @@ async function main() {
         }
     });
 
-    // ============ MODIFICADO: Usar API de lista circular ============
     nextBtn.addEventListener("click", () => {
-        console.log("🖱️ Click en botón NEXT");
-        if (songs.length === 0) {
-            console.log("⚠️ No hay canciones en la playlist");
-            return;
-        }
+        if (songs.length === 0) return;
         nextSongAPI();
     });
 
-    // ============ MODIFICADO: Usar API de lista circular ============
     prevBtn.addEventListener("click", () => {
-        console.log("🖱️ Click en botón PREVIOUS");
-        if (songs.length === 0) {
-            console.log("⚠️ No hay canciones en la playlist");
-            return;
-        }
+        if (songs.length === 0) return;
         previousSongAPI();
     });
 
-    // ============ EVENTOS DE AUDIO ============
-    // Actualizar barra de progreso mientras se reproduce
     currentSong.addEventListener("timeupdate", updateProgressBar);
 
-    // ============ NUEVO: Auto-reproducción circular ============
     currentSong.addEventListener("ended", () => {
-        console.log("🎵 Canción terminada, siguiente automático...");
         nextSongAPI();
     });
 
-    // ============ CONTROL DE LA BARRA DE PROGRESO ============
     const seekbar = document.querySelector(".seekbar");
     
     if (seekbar) {
@@ -322,7 +270,6 @@ async function main() {
         });
     }
 
-    // ============ CONTROL DEL VOLUMEN ============
     const volumeBar = document.querySelector(".volume input[type='range']");
     
     if (volumeBar) {
@@ -330,12 +277,10 @@ async function main() {
             currentSong.volume = e.target.value / 100;
         });
         
-        // Establecer volumen inicial al 50%
         currentSong.volume = 0.5;
         volumeBar.value = 50;
     }
 
-    // ============ FORMULARIO DE PLAYLIST ============
     document.getElementById("addPlaylist").onclick = () => {
         const form = document.getElementById("formPlaylist");
         form.style.display = form.style.display === "none" ? "block" : "none";
@@ -362,7 +307,6 @@ async function main() {
         }
     };
 
-    // ============ UPLOAD MÚSICA ============
     const uploadBtn = document.getElementById("addMusic");
     const uploadInput = document.getElementById("uploadFiles");
 
@@ -376,27 +320,20 @@ async function main() {
             return;
         }
 
-        console.log(`Subiendo a playlist: "${selectedPlaylist}"`);
-
         for (const file of uploadInput.files) {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("playlist", selectedPlaylist);
 
-            const response = await fetch("/api/add_song", {
+            await fetch("/api/add_song", {
                 method: "POST",
                 body: formData
             });
-
-            const data = await response.json();
-            console.log("Canción agregada:", data);
         }
 
         uploadInput.value = "";
         await loadDataFromBackend();
     };
-    
-    console.log("✅ Reproductor inicializado completamente");
 }
 
 main();
