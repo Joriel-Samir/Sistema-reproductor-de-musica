@@ -37,10 +37,16 @@ function renderPlaylists() {
 }
 
 // ============ SELECCIONAR PLAYLIST ============
-function selectPlaylist(idx) {
+async function selectPlaylist(idx) {
     currentPlaylistIndex = idx;  // Guardar índice de playlist
     currentIndex = 0;            // Resetear índice de canción
     songs = playlists[idx].songs;
+    
+    // ============ NUEVO: Inicializar canción actual en backend ============
+    if (songs.length > 0) {
+        await setCurrentSongAPI(0);
+    }
+    
     renderPlaylists();  // Re-renderizar para actualizar highlight
     renderSongs();
     updatePlayer();
@@ -67,8 +73,9 @@ function renderSongs() {
             </div>
         `;
 
-        card.onclick = () => {
+        card.onclick = async () => {
             currentIndex = idx;
+            await setCurrentSongAPI(idx);
             renderSongs();
             playMusic(song.url);
         };
@@ -125,16 +132,132 @@ async function loadDataFromBackend() {
         renderPlaylists();
 
         if (playlists.length > 0) {
-            selectPlaylist(currentPlaylistIndex);  
+            await selectPlaylist(currentPlaylistIndex);  
         }
     } catch (err) {
         console.error("Error cargando playlists:", err);
     }
 }
 
+// ============ NUEVAS FUNCIONES API - LISTA CIRCULAR ============
+
+async function nextSongAPI() {
+    const playlistName = playlists[currentPlaylistIndex]?.name;
+    if (!playlistName) {
+        console.error("❌ No hay playlist seleccionada");
+        return;
+    }
+
+    console.log("🔄 Llamando API next para:", playlistName);
+
+    try {
+        const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/next`, {
+            method: "POST"
+        });
+        const data = await response.json();
+        
+        console.log("✅ Respuesta next:", data);
+        
+        if (response.ok && data.song) {
+            // Encontrar índice de la nueva canción
+            currentIndex = songs.findIndex(s => s.name === data.song.name && s.url === data.song.url);
+            
+            if (currentIndex === -1) {
+                console.warn("⚠️ Canción no encontrada en array, usando índice 0");
+                currentIndex = 0;
+            }
+            
+            renderSongs();
+            updatePlayer();
+            playMusic(data.song.url);
+            console.log("🎵 Reproduciendo:", data.song.name);
+        } else {
+            console.error("❌ Error en respuesta:", data);
+        }
+    } catch (err) {
+        console.error("❌ Error en next song:", err);
+    }
+}
+
+async function previousSongAPI() {
+    const playlistName = playlists[currentPlaylistIndex]?.name;
+    if (!playlistName) {
+        console.error("❌ No hay playlist seleccionada");
+        return;
+    }
+
+    console.log("🔄 Llamando API previous para:", playlistName);
+
+    try {
+        const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/previous`, {
+            method: "POST"
+        });
+        const data = await response.json();
+        
+        console.log("✅ Respuesta previous:", data);
+        
+        if (response.ok && data.song) {
+            currentIndex = songs.findIndex(s => s.name === data.song.name && s.url === data.song.url);
+            
+            if (currentIndex === -1) {
+                console.warn("⚠️ Canción no encontrada en array, usando índice 0");
+                currentIndex = 0;
+            }
+            
+            renderSongs();
+            updatePlayer();
+            playMusic(data.song.url);
+            console.log("🎵 Reproduciendo:", data.song.name);
+        } else {
+            console.error("❌ Error en respuesta:", data);
+        }
+    } catch (err) {
+        console.error("❌ Error en previous song:", err);
+    }
+}
+
+async function setCurrentSongAPI(index) {
+    const playlistName = playlists[currentPlaylistIndex]?.name;
+    if (!playlistName) return;
+
+    console.log(`🎯 Estableciendo canción ${index} en playlist:`, playlistName);
+
+    try {
+        const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/set_current/${index}`, {
+            method: "POST"
+        });
+        const data = await response.json();
+        console.log("✅ Set current response:", data);
+    } catch (err) {
+        console.error("❌ Error en set current song:", err);
+    }
+}
+
+async function sortPlaylist(sortBy) {
+    const playlistName = playlists[currentPlaylistIndex]?.name;
+    if (!playlistName) {
+        alert("Selecciona una playlist primero");
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/playlist/${encodeURIComponent(playlistName)}/sort/${sortBy}`, {
+            method: "POST"
+        });
+        const data = await response.json();
+        
+        if (response.ok) {
+            console.log(`✅ Playlist ordenada por ${sortBy}`);
+            await loadDataFromBackend();
+        }
+    } catch (err) {
+        console.error("Error ordenando:", err);
+    }
+}
+
 // ============ MAIN ============
 async function main() {
-    console.log("Inicializando reproductor…");
+    console.log("🎵 Inicializando reproductor…");
 
     await loadDataFromBackend();
 
@@ -153,23 +276,35 @@ async function main() {
         }
     });
 
+    // ============ MODIFICADO: Usar API de lista circular ============
     nextBtn.addEventListener("click", () => {
-        if (songs.length === 0) return;
-        currentIndex = (currentIndex + 1) % songs.length;
-        renderSongs();
-        playMusic(songs[currentIndex].url);
+        console.log("🖱️ Click en botón NEXT");
+        if (songs.length === 0) {
+            console.log("⚠️ No hay canciones en la playlist");
+            return;
+        }
+        nextSongAPI();
     });
 
+    // ============ MODIFICADO: Usar API de lista circular ============
     prevBtn.addEventListener("click", () => {
-        if (songs.length === 0) return;
-        currentIndex = (currentIndex - 1 + songs.length) % songs.length;
-        renderSongs();
-        playMusic(songs[currentIndex].url);
+        console.log("🖱️ Click en botón PREVIOUS");
+        if (songs.length === 0) {
+            console.log("⚠️ No hay canciones en la playlist");
+            return;
+        }
+        previousSongAPI();
     });
 
     // ============ EVENTOS DE AUDIO ============
     // Actualizar barra de progreso mientras se reproduce
     currentSong.addEventListener("timeupdate", updateProgressBar);
+
+    // ============ NUEVO: Auto-reproducción circular ============
+    currentSong.addEventListener("ended", () => {
+        console.log("🎵 Canción terminada, siguiente automático...");
+        nextSongAPI();
+    });
 
     // ============ CONTROL DE LA BARRA DE PROGRESO ============
     const seekbar = document.querySelector(".seekbar");
@@ -260,6 +395,8 @@ async function main() {
         uploadInput.value = "";
         await loadDataFromBackend();
     };
+    
+    console.log("✅ Reproductor inicializado completamente");
 }
 
 main();
